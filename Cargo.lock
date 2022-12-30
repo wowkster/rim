@@ -20,6 +20,8 @@ version = "0.1.0"
 dependencies = [
  "anes",
  "term_size",
+ "win32console",
+ "winapi",
 ]
 
 [[package]]
@@ -29,6 +31,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e4129646ca0ed8f45d09b929036bafad5377103edd06e50bf574b353d2b08d9"
 dependencies = [
  "libc",
+ "winapi",
+]
+
+[[package]]
+name = "win32console"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e69bbdf01990d3e8b9f5a7c4667feda30c63be20aa2f8e66b2f4efb6c06f673"
+dependencies = [
  "winapi",
 ]
 

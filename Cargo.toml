@@ -8,3 +8,5 @@ edition = "2021"
 [dependencies]
 anes = "0.1.6"
 term_size = "0.3.2"
+win32console = "0.1.5"
+winapi = "0.3.9"
