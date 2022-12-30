@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::io::{Result, Write};
 
 use anes::esc;
@@ -25,7 +26,17 @@ use winapi::um::consoleapi::SetConsoleCtrlHandler;
 use winapi::um::wincon::CTRL_C_EVENT;
 
 fn main() {
-    Editor::start();
+    let mut args: VecDeque<_> = std::env::args().collect();
+    args.pop_front().unwrap();
+
+    let text_buffer = match args.pop_front() {
+        Some(path) => std::fs::read_to_string(&path)
+            .map(|c| Some(c))
+            .expect(format!("Could not read file `{path}`").as_str()),
+        None => None,
+    };
+
+    Editor::start(text_buffer);
 }
 
 enum EditorMode {
@@ -66,11 +77,11 @@ impl Editor {
             .expect("Could not switch back terminal color");
     }
 
-    fn start() {
+    fn start(text_buffer: Option<String>) {
         let editor = Editor {
             width: 0,
             height: 0,
-            text_buffer: String::from(""),
+            text_buffer: text_buffer.unwrap_or(String::from("")),
             cursor_index: 0,
             mode: EditorMode::Normal,
         };
