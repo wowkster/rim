@@ -32,8 +32,8 @@ enum EditorMode {
 }
 
 struct Editor {
-    w: usize,
-    h: usize,
+    width: usize,
+    height: usize,
     text_buffer: String,
     cursor_index: usize,
     mode: EditorMode,
@@ -58,8 +58,8 @@ impl Editor {
 
     fn start() {
         let editor = Editor {
-            w: 0,
-            h: 0,
+            width: 0,
+            height: 0,
             text_buffer: String::from(
                 "\
                 struct Editor {\n\
@@ -420,7 +420,7 @@ impl Editor {
             .get_content_of_row(current_row_index)
             .expect("Could not get content of current row");
 
-        if current_row_content.len() >= self.w {
+        if current_row_content.len() >= self.width {
             todo!("Handle inserting on line longer than screen width")
         }
 
@@ -444,7 +444,7 @@ impl Editor {
         // Create a render buffer to limit write syscalls
         let mut render_buffer = Vec::new();
 
-        for row in 0..self.h - 1 {
+        for row in 0..self.height - 1 {
             execute!(&mut render_buffer, SetForegroundColor(Color::Default))?;
 
             let line = lines.get(row as usize);
@@ -452,10 +452,10 @@ impl Editor {
             if let Some(line) = line {
                 // Print line
 
-                let slice = if line.len() < self.w {
+                let slice = if line.len() < self.width {
                     &line[0..]
                 } else {
-                    &line[0..self.w]
+                    &line[0..self.width]
                 };
 
                 write!(&mut render_buffer, "{}", slice)?;
@@ -506,7 +506,7 @@ impl Editor {
         };
 
         // Don't care unless size changed
-        if w == self.w && h == self.h {
+        if w == self.width && h == self.height {
             return false;
         }
 
@@ -515,8 +515,8 @@ impl Editor {
         execute!(&mut stdout, ClearBuffer::All).expect("Could not clear terminal buffer on resize");
 
         // Set the new size for next render
-        self.w = w;
-        self.h = h;
+        self.width = w;
+        self.height = h;
 
         true
     }
