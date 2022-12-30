@@ -3,11 +3,13 @@ use std::io::{Result, Write};
 use anes::execute;
 use anes::ClearBuffer;
 use anes::Color;
+use anes::MoveCursorDown;
 use anes::MoveCursorLeft;
 use anes::MoveCursorRight;
 use anes::MoveCursorTo;
 use anes::MoveCursorToNextLine;
 use anes::MoveCursorToPreviousLine;
+use anes::MoveCursorUp;
 use anes::RestoreCursorPosition;
 use anes::SaveCursorPosition;
 use anes::SetForegroundColor;
@@ -53,7 +55,15 @@ impl Editor {
             w: 0,
             h: 0,
             text_buffer: String::from(
-                "fn main() {\n\
+                "\
+                struct Editor {\n\
+                \x20\x20\x20\x20w: usize,\n\
+                \x20\x20\x20\x20h: usize,\n\
+                \x20\x20\x20\x20text_buffer: String,\n\
+                \x20\x20\x20\x20cursor_index: usize,\n\
+                }\n\
+                \n\
+                fn main() {\n\
                 \x20\x20\x20\x20println!(\"Hello World\");\n\
                 }",
             ),
@@ -121,7 +131,7 @@ impl Editor {
                 self.render().expect("Failed to render screen");
             }
 
-            should_render = false;
+            should_render = true;
 
             if let KeyEvent(key) = WinConsole::input().read_single_input().unwrap() {
                 // Only check for key down events
@@ -154,12 +164,12 @@ impl Editor {
                                 }
 
                                 /* Get the current cursor row and column */
-                                let row = self.get_cursor_row();
+                                let row = self.get_cursor_row_index();
                                 let row = self
-                                    .get_text_row(row)
+                                    .get_content_of_row(row)
                                     .expect("Cursor row was not in bounds of text_buffer");
                                 let row_len = row.len();
-                                let col = self.get_cursor_col();
+                                let col = self.get_cursor_col_index();
 
                                 // Increment the cursor index
                                 self.cursor_index += 1;
@@ -181,7 +191,7 @@ impl Editor {
                                 }
 
                                 /* Get the current cursor row and column */
-                                let col = self.get_cursor_col();
+                                let col = self.get_cursor_col_index();
 
                                 // Increment the cursor index
                                 self.cursor_index -= 1;
@@ -192,24 +202,114 @@ impl Editor {
                                         .expect("Could not move cursor left");
                                 } else {
                                     /* Cursor is at the end of a line */
-                                    let current_row_index = self.get_cursor_row();
-                                    let previous_row = self.get_text_row(current_row_index).expect(
-                                        "Tried to move cursor up when no line was found above",
-                                    );
+                                    let current_row_index = self.get_cursor_row_index();
+                                    let previous_row =
+                                        self.get_content_of_row(current_row_index).expect(
+                                            "Tried to move cursor up when no line was found above",
+                                        );
 
-                                    execute!(
-                                        &mut stdout,
-                                        MoveCursorToPreviousLine(1),
-                                        MoveCursorRight(previous_row.len() as u16)
-                                    )
-                                    .expect("Could not move cursor to previous line");
+                                    execute!(&mut stdout, MoveCursorToPreviousLine(1))
+                                        .expect("Could not move cursor to previous line");
+
+                                    if previous_row.len() > 0 {
+                                        execute!(
+                                            &mut stdout,
+                                            MoveCursorRight(previous_row.len() as u16)
+                                        )
+                                        .expect("Could not move cursor to end of previous line");
+                                    }
                                 }
                             }
                             ARROW_DOWN => {
-                                todo!("Handle arrow down")
+                                let row_index = self.get_cursor_row_index();
+
+                                // If at end of file, don't move the cursor
+                                if self.get_num_rows() == row_index + 1 {
+                                    continue 'key_handler;
+                                }
+
+                                let col_index = self.get_cursor_col_index();
+
+                                let current_row = self
+                                    .get_content_of_row(row_index)
+                                    .expect("Could not get content of current row");
+                                let next_row = self
+                                    .get_content_of_row(row_index + 1)
+                                    .expect("Could not get content of next row");
+                                let next_row_len = next_row.len();
+
+                                if next_row.len() < col_index + 1 {
+                                    /* Go to end next line */
+
+                                    // Move cursor index by ((what is left of the current line) + \n + (text content of next line up until the cursor col))
+                                    self.cursor_index += &current_row[col_index..].len() + 1;
+                                    self.cursor_index += next_row_len;
+
+                                    execute!(&mut stdout, MoveCursorToNextLine(1),)
+                                        .expect("Could not move cursor to next line");
+
+                                    if next_row_len > 0 {
+                                        execute!(
+                                            &mut stdout,
+                                            MoveCursorRight(next_row_len as u16),
+                                        )
+                                        .expect("Could not move cursor to end of next line");
+                                    }
+                                } else {
+                                    /* Move cursor down one space */
+
+                                    // Move cursor index by ((what is left of the current line) + \n + (text content of next line up until the cursor col))
+                                    self.cursor_index += &current_row[col_index..].len() + 1;
+                                    self.cursor_index += col_index;
+
+                                    execute!(&mut stdout, MoveCursorDown(1))
+                                        .expect("Could not move cursor to previous line");
+                                }
                             }
                             ARROW_UP => {
-                                todo!("Handle arrow up")
+                                let row_index = self.get_cursor_row_index();
+
+                                // If at end of file, don't move the cursor
+                                if row_index == 0 {
+                                    continue 'key_handler;
+                                }
+
+                                let col_index = self.get_cursor_col_index();
+
+                                let current_row = self
+                                    .get_content_of_row(row_index)
+                                    .expect("Could not get content of current row");
+                                let previous_row = self
+                                    .get_content_of_row(row_index - 1)
+                                    .expect("Could not get content of previous row");
+                                let previous_row_len = previous_row.len();
+
+                                if previous_row.len() < col_index + 1 {
+                                    /* Go to end previous line */
+
+                                    // Move cursor index by ((what is left of the current line) + \n + (text content of previous line up until the cursor col))
+                                    self.cursor_index -= &current_row[..col_index].len() + 1;
+
+                                    execute!(&mut stdout, MoveCursorToPreviousLine(1))
+                                        .expect("Could not move cursor to previous line");
+
+                                    if previous_row_len > 0 {
+                                        execute!(
+                                            &mut stdout,
+                                            MoveCursorRight(previous_row_len as u16)
+                                        )
+                                        .expect("Could not move cursor to end of previous line");
+                                    }
+                                } else {
+                                    /* Move cursor up one space */
+
+                                    // Move cursor index by ((what is left of the current line) + \n + (text content of next line up until the cursor col))
+                                    self.cursor_index -= &previous_row[col_index..].len() + 1;
+                                    self.cursor_index -= col_index;
+
+                                    execute!(&mut stdout, MoveCursorUp(1))
+                                        .expect("Could not move cursor to previous line");
+                                }
                             }
                             code => {
                                 todo!("Handle key code: {code} (0x{code:x?})");
@@ -221,13 +321,19 @@ impl Editor {
         }
     }
 
-    fn get_text_row(&self, row: usize) -> Option<&str> {
+    fn get_content_of_row(&self, row: usize) -> Option<&str> {
         let mut lines = self.text_buffer.lines();
 
         lines.nth(row)
     }
 
-    fn get_cursor_row(&self) -> usize {
+    fn get_num_rows(&self) -> usize {
+        let lines: Vec<_> = self.text_buffer.lines().collect();
+
+        lines.len()
+    }
+
+    fn get_cursor_row_index(&self) -> usize {
         let mut row = 0;
 
         for (i, c) in self.text_buffer.chars().enumerate() {
@@ -244,7 +350,7 @@ impl Editor {
         row
     }
 
-    fn get_cursor_col(&self) -> usize {
+    fn get_cursor_col_index(&self) -> usize {
         let mut chars = 0;
 
         for line in self.text_buffer.lines() {
@@ -302,14 +408,14 @@ impl Editor {
             execute!(&mut render_buffer, SetForegroundColor(Color::Default))?;
         }
 
-        let row_index = self.get_cursor_row();
+        let row_index = self.get_cursor_row_index();
         let row_text = self
-            .get_text_row(row_index)
+            .get_content_of_row(row_index)
             .expect("Cursor row was not in bounds of text_buffer");
 
         let row_len = row_text.len();
 
-        let col_index = self.get_cursor_col();
+        let col_index = self.get_cursor_col_index();
 
         write!(
             &mut render_buffer,
