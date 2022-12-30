@@ -133,7 +133,7 @@ impl Editor {
 
         let mut should_render = true;
 
-        'key_handler: loop {
+        loop {
             let resized = self.resize_if_changed();
 
             if should_render || resized {
