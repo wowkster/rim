@@ -157,15 +157,9 @@ impl Editor {
                             ESCAPE => {
                                 return;
                             }
-                            ENTER => {
-                                todo!("Insert new line at current cursor position")
-                            }
-                            SPACE => {
-                                todo!("Insert space at current cursor position")
-                            }
-                            BACKSPACE => {
-                                todo!("Remove char at current cursor position")
-                            }
+                            ENTER => self.move_cursor_to_next_line(),
+                            SPACE => self.move_cursor_right(),
+                            BACKSPACE => self.move_cursor_left(),
                             ARROW_RIGHT => self.move_cursor_right(),
                             ARROW_LEFT => self.move_cursor_left(),
                             ARROW_DOWN => self.move_cursor_down(),
@@ -376,6 +370,29 @@ impl Editor {
 
             execute!(&mut stdout, MoveCursorUp(1)).expect("Could not move cursor to previous line");
         }
+    }
+
+    fn move_cursor_to_next_line(&mut self) {
+        let mut stdout = std::io::stdout();
+
+        let row_index = self.get_cursor_row_index();
+
+        // If at end of file, don't move the cursor
+        if self.get_num_rows() == row_index + 1 {
+            return;
+        }
+
+        let col_index = self.get_cursor_col_index();
+
+        let current_row = self
+            .get_content_of_row(row_index)
+            .expect("Could not get content of current row");
+
+        // Move cursor index by (what is left of the current line) + \n
+        self.cursor_index += &current_row[col_index..].len() + 1;
+
+        execute!(&mut stdout, MoveCursorToNextLine(1),)
+            .expect("Could not move cursor to next line");
     }
 
     fn render(&self) -> Result<()> {
