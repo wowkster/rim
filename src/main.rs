@@ -370,6 +370,14 @@ impl Editor {
             return;
         }
 
+        let mut should_cursor_move_lines = true;
+
+        // If next line is outside the screen, scroll the screen down
+        if self.top_line != 0 && row_index - self.top_line <= 0 {
+            self.top_line -= 1;
+            should_cursor_move_lines = false;
+        }
+
         let col_index = self.get_cursor_col_index();
 
         let current_row = self
@@ -386,11 +394,13 @@ impl Editor {
             // Move cursor index by ((what is left of the current line) + \n + (text content of previous line up until the cursor col))
             self.cursor_index -= &current_row[..col_index].len() + 1;
 
-            execute!(&mut stdout, MoveCursorToPreviousLine(1))
-                .expect("Could not move cursor to previous line");
+            if should_cursor_move_lines {
+                execute!(&mut stdout, MoveCursorToPreviousLine(1))
+                    .expect("Could not move cursor to previous line");
+            }
 
             if previous_row_len > 0 {
-                execute!(&mut stdout, MoveCursorRight(previous_row_len as u16))
+                execute!(&mut stdout, MoveCursorToColumn(previous_row_len as u16 + 1))
                     .expect("Could not move cursor to end of previous line");
             }
         } else {
@@ -400,7 +410,10 @@ impl Editor {
             self.cursor_index -= &previous_row[col_index..].len() + 1;
             self.cursor_index -= col_index;
 
-            execute!(&mut stdout, MoveCursorUp(1)).expect("Could not move cursor to previous line");
+            if should_cursor_move_lines {
+                execute!(&mut stdout, MoveCursorUp(1))
+                    .expect("Could not move cursor to previous line");
+            }
         }
     }
 
