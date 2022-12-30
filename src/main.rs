@@ -70,19 +70,7 @@ impl Editor {
         let editor = Editor {
             width: 0,
             height: 0,
-            text_buffer: String::from(
-                "\
-                struct Editor {\n\
-                \x20\x20\x20\x20w: usize,\n\
-                \x20\x20\x20\x20h: usize,\n\
-                \x20\x20\x20\x20text_buffer: String,\n\
-                \x20\x20\x20\x20cursor_index: usize,\n\
-                }\n\
-                \n\
-                fn main() {\n\
-                \x20\x20\x20\x20println!(\"Hello World\");\n\
-                }",
-            ),
+            text_buffer: String::from(""),
             cursor_index: 0,
             mode: EditorMode::Normal,
         };
