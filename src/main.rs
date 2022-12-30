@@ -468,6 +468,13 @@ impl Editor {
             return;
         }
 
+        /*
+         * String#remove panics if the index is invalid
+         */
+        if self.cursor_index >= self.text_buffer.len() - 1 {
+            return;
+        }
+
         self.text_buffer.remove(self.cursor_index);
     }
 
