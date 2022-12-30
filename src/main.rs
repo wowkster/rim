@@ -1,7 +1,6 @@
 use std::collections::VecDeque;
 use std::io::{Result, Write};
 
-use anes::esc;
 use anes::execute;
 use anes::sequence;
 use anes::ClearBuffer;
@@ -18,6 +17,7 @@ use anes::SaveCursorPosition;
 use anes::SetForegroundColor;
 use anes::SwitchBufferToAlternate;
 use anes::SwitchBufferToNormal;
+use anes::{esc, MoveCursorToColumn};
 use win32console::console::WinConsole;
 use win32console::input::InputRecord::KeyEvent;
 use winapi::shared::minwindef::BOOL;
@@ -58,6 +58,7 @@ struct Editor {
     text_buffer: String,
     cursor_index: usize,
     mode: EditorMode,
+    top_line: usize,
 }
 
 impl Editor {
@@ -84,6 +85,7 @@ impl Editor {
             text_buffer: text_buffer.unwrap_or(String::from("")),
             cursor_index: 0,
             mode: EditorMode::Normal,
+            top_line: 0,
         };
 
         /*
@@ -186,9 +188,10 @@ impl Editor {
             return Some("");
         }
 
-        let mut lines = self.text_buffer.lines();
+        let lines = self.get_lines();
+        let mut lines = lines.iter();
 
-        lines.nth(row)
+        lines.nth(row).map(|l| *l)
     }
 
     fn get_num_rows(&self) -> usize {
@@ -196,14 +199,13 @@ impl Editor {
             return 1;
         }
 
-        let lines: Vec<_> = self.text_buffer.lines().collect();
+        let lines = self.get_lines();
 
         lines.len()
     }
 
     fn get_cursor_row_index(&self) -> usize {
         let mut row = 0;
-
         for (i, c) in self.text_buffer.chars().enumerate() {
             // If the index is between the start of this line and the end, return the current row number
             if self.cursor_index == i {
@@ -307,6 +309,14 @@ impl Editor {
             return;
         }
 
+        let mut should_cursor_move_lines = true;
+
+        // If next line is outside the screen, scroll the screen down
+        if row_index - self.top_line >= self.height - 2 {
+            self.top_line += 1;
+            should_cursor_move_lines = false;
+        }
+
         let col_index = self.get_cursor_col_index();
 
         let current_row = self
@@ -324,12 +334,17 @@ impl Editor {
             self.cursor_index += &current_row[col_index..].len() + 1;
             self.cursor_index += next_row_len;
 
-            execute!(&mut stdout, MoveCursorToNextLine(1),)
-                .expect("Could not move cursor to next line");
+            if should_cursor_move_lines {
+                execute!(&mut stdout, MoveCursorToNextLine(1),)
+                    .expect("Could not move cursor to next line");
 
-            if next_row_len > 0 {
-                execute!(&mut stdout, MoveCursorRight(next_row_len as u16),)
-                    .expect("Could not move cursor to end of next line");
+                if next_row_len > 0 {
+                    execute!(&mut stdout, MoveCursorRight(next_row_len as u16),)
+                        .expect("Could not move cursor to end of next line");
+                }
+            } else {
+                execute!(&mut stdout, MoveCursorToColumn(1),)
+                    .expect("Could not move cursor to next line");
             }
         } else {
             /* Move cursor down one space */
@@ -338,8 +353,10 @@ impl Editor {
             self.cursor_index += &current_row[col_index..].len() + 1;
             self.cursor_index += col_index;
 
-            execute!(&mut stdout, MoveCursorDown(1))
-                .expect("Could not move cursor to previous line");
+            if should_cursor_move_lines {
+                execute!(&mut stdout, MoveCursorDown(1))
+                    .expect("Could not move cursor to previous line");
+            }
         }
     }
 
@@ -459,7 +476,13 @@ impl Editor {
             return vec![""];
         }
 
-        self.text_buffer.lines().collect()
+        let mut lines: Vec<_> = self.text_buffer.lines().collect();
+
+        if self.text_buffer.ends_with("\n") {
+            lines.push("")
+        }
+
+        lines
     }
 
     fn render(&self) -> Result<()> {
@@ -477,7 +500,7 @@ impl Editor {
         // Create a render buffer to limit write syscalls
         let mut render_buffer = Vec::new();
 
-        for row in 0..self.height - 1 {
+        for row in self.top_line..(self.top_line + self.height - 1) {
             execute!(&mut render_buffer, SetForegroundColor(Color::Default))?;
 
             let line = lines.get(row as usize);
@@ -507,7 +530,7 @@ impl Editor {
         let row_index = self.get_cursor_row_index();
         let row_text = self
             .get_content_of_row(row_index)
-            .expect("Cursor row was not in bounds of text_buffer");
+            .expect(format!("Cursor row {row_index} was not in bounds of text_buffer").as_str());
 
         let row_len = row_text.len();
 
@@ -515,7 +538,7 @@ impl Editor {
 
         write!(
             &mut render_buffer,
-            "{} | Cursor Index: {} | Row Index: {} | Col Index: {} | Row Length: {}",
+            "{} | Cursor Index: {} | Row Index: {} | Col Index: {} | Row Length: {} | Top Line: {} | Width: {} | Height: {}",
             match self.mode {
                 EditorMode::Normal => "-- NORMAL --",
                 EditorMode::Insert => "-- INSERT --",
@@ -523,7 +546,10 @@ impl Editor {
             self.cursor_index,
             row_index,
             col_index,
-            row_len
+            row_len,
+            self.top_line,
+            self.width,
+            self.height
         )?;
 
         match self.mode {
