@@ -152,9 +152,7 @@ impl Editor {
                         }
                     } else {
                         match key.virtual_key_code {
-                            ESCAPE => {
-                                return;
-                            }
+                            ESCAPE => self.mode = EditorMode::Normal,
                             ENTER => self.move_cursor_to_next_line(),
                             SPACE => self.move_cursor_right(),
                             BACKSPACE => self.move_cursor_left(),
@@ -487,7 +485,10 @@ impl Editor {
                 EditorMode::Normal => "-- NORMAL --",
                 EditorMode::Insert => "-- INSERT --",
             },
-            self.cursor_index, row_index, col_index, row_len
+            self.cursor_index,
+            row_index,
+            col_index,
+            row_len
         )?;
 
         execute!(&mut render_buffer, RestoreCursorPosition)?;
