@@ -29,8 +29,6 @@ fn main() {
 enum EditorMode {
     Normal,
     Insert,
-    Visual,
-    Command,
 }
 
 struct Editor {
@@ -148,10 +146,10 @@ impl Editor {
                     let char_value = key.u_char;
                     // Write only if is alphanumeric or punctuation
                     if char_value.is_ascii_alphanumeric() || char_value.is_ascii_punctuation() {
-                        todo!(
-                            "Handle ascii text char: {char_value} (0x{:x?})",
-                            char_value as u32
-                        );
+                        match self.mode {
+                            EditorMode::Normal => self.handle_normal_char(char_value),
+                            EditorMode::Insert => self.handle_insert_char(char_value),
+                        }
                     } else {
                         match key.virtual_key_code {
                             ESCAPE => {
@@ -395,6 +393,29 @@ impl Editor {
             .expect("Could not move cursor to next line");
     }
 
+    /**
+     * Handle movement inputs in normal mode
+     */
+    fn handle_normal_char(&mut self, char_value: char) {
+        match char_value {
+            'i' => self.mode = EditorMode::Insert,
+            _ => todo!(
+                "Handle ascii text char: {char_value} (0x{:x?}) in NORMAL mode",
+                char_value as u32
+            ),
+        }
+    }
+
+    /**
+     * Handle text input in insert mode
+     */
+    fn handle_insert_char(&mut self, char_value: char) {
+        todo!(
+            "Handle ascii text char: {char_value} (0x{:x?}) in INSERT mode",
+            char_value as u32
+        )
+    }
+
     fn render(&self) -> Result<()> {
         let mut stdout = std::io::stdout();
 
@@ -448,7 +469,11 @@ impl Editor {
 
         write!(
             &mut render_buffer,
-            "Cursor Index: {} | Row Index: {} | Col Index: {} | Row Length: {} | Row Text : {:?}",
+            "{} | Cursor Index: {} | Row Index: {} | Col Index: {} | Row Length: {} | Row Text : {:?}",
+            match self.mode {
+                EditorMode::Normal => "-- NORMAL --",
+                EditorMode::Insert => "-- INSERT --",
+            },
             self.cursor_index, row_index, col_index, row_len, row_text
         )?;
 
