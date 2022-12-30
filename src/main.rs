@@ -410,10 +410,23 @@ impl Editor {
      * Handle text input in insert mode
      */
     fn handle_insert_char(&mut self, char_value: char) {
-        todo!(
-            "Handle ascii text char: {char_value} (0x{:x?}) in INSERT mode",
-            char_value as u32
-        )
+        assert!(
+            char_value.is_ascii_alphanumeric() || char_value.is_ascii_punctuation(),
+            "Character is not alphanumeric"
+        );
+
+        let current_row_index = self.get_cursor_row_index();
+        let current_row_content = self
+            .get_content_of_row(current_row_index)
+            .expect("Could not get content of current row");
+
+        if current_row_content.len() >= self.w {
+            todo!("Handle inserting on line longer than screen width")
+        }
+
+        self.text_buffer.insert(self.cursor_index, char_value);
+
+        self.move_cursor_right();
     }
 
     fn render(&self) -> Result<()> {
@@ -469,12 +482,12 @@ impl Editor {
 
         write!(
             &mut render_buffer,
-            "{} | Cursor Index: {} | Row Index: {} | Col Index: {} | Row Length: {} | Row Text : {:?}",
+            "{} | Cursor Index: {} | Row Index: {} | Col Index: {} | Row Length: {}",
             match self.mode {
                 EditorMode::Normal => "-- NORMAL --",
                 EditorMode::Insert => "-- INSERT --",
             },
-            self.cursor_index, row_index, col_index, row_len, row_text
+            self.cursor_index, row_index, col_index, row_len
         )?;
 
         execute!(&mut render_buffer, RestoreCursorPosition)?;
