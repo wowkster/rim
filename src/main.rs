@@ -23,6 +23,7 @@ use win32console::input::InputRecord::KeyEvent;
 use winapi::shared::minwindef::BOOL;
 use winapi::shared::minwindef::DWORD;
 use winapi::um::consoleapi::SetConsoleCtrlHandler;
+use winapi::um::playsoundapi::{PlaySoundA, SND_ALIAS, SND_ASYNC};
 use winapi::um::wincon::CTRL_C_EVENT;
 
 fn main() {
@@ -241,6 +242,7 @@ impl Editor {
 
         // If at end of file, don't move the cursor
         if self.cursor_index == self.text_buffer.len() {
+            play_not_allowed_sound();
             return;
         }
 
@@ -270,6 +272,7 @@ impl Editor {
 
         // If at beginning of file, don't move the cursor
         if self.cursor_index == 0 {
+            play_not_allowed_sound();
             return;
         }
 
@@ -306,6 +309,7 @@ impl Editor {
 
         // If at end of file, don't move the cursor
         if self.get_num_rows() == row_index + 1 {
+            play_not_allowed_sound();
             return;
         }
 
@@ -367,6 +371,7 @@ impl Editor {
 
         // If at end of file, don't move the cursor
         if row_index == 0 {
+            play_not_allowed_sound();
             return;
         }
 
@@ -424,6 +429,7 @@ impl Editor {
 
         // If at end of file, don't move the cursor
         if self.get_num_rows() == row_index + 1 {
+            play_not_allowed_sound();
             return;
         }
 
@@ -606,5 +612,15 @@ impl Editor {
         self.height = h;
 
         true
+    }
+}
+
+fn play_not_allowed_sound() {
+    unsafe {
+        PlaySoundA(
+            "SystemStart".as_ptr() as *const i8,
+            std::ptr::null_mut(),
+            SND_ALIAS | SND_ASYNC,
+        );
     }
 }
