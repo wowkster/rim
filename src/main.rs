@@ -1,6 +1,8 @@
 use std::io::{Result, Write};
 
+use anes::esc;
 use anes::execute;
+use anes::sequence;
 use anes::ClearBuffer;
 use anes::Color;
 use anes::MoveCursorDown;
@@ -30,6 +32,14 @@ enum EditorMode {
     Normal,
     Insert,
 }
+
+sequence!(
+    struct SetCursorBlinkingBlock => esc!("[1 q")
+);
+
+sequence!(
+    struct SetCursorBlinkingUnderline => esc!("[3 q")
+);
 
 struct Editor {
     width: usize,
@@ -122,6 +132,7 @@ impl Editor {
         // https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
         const ESCAPE: u16 = 0x1B;
         const BACKSPACE: u16 = 0x08;
+        const DELETE: u16 = 0x2e;
         const ENTER: u16 = 0x0D;
         const SPACE: u16 = 0x20;
         const ARROW_LEFT: u16 = 0x25;
@@ -156,6 +167,7 @@ impl Editor {
                             ENTER => self.move_cursor_to_next_line(),
                             SPACE => self.move_cursor_right(),
                             BACKSPACE => self.move_cursor_left(),
+                            DELETE => self.delete_char(),
                             ARROW_RIGHT => self.move_cursor_right(),
                             ARROW_LEFT => self.move_cursor_left(),
                             ARROW_DOWN => self.move_cursor_down(),
@@ -171,12 +183,20 @@ impl Editor {
     }
 
     fn get_content_of_row(&self, row: usize) -> Option<&str> {
+        if self.text_buffer.len() == 0 {
+            return Some("");
+        }
+
         let mut lines = self.text_buffer.lines();
 
         lines.nth(row)
     }
 
     fn get_num_rows(&self) -> usize {
+        if self.text_buffer.len() == 0 {
+            return 1;
+        }
+
         let lines: Vec<_> = self.text_buffer.lines().collect();
 
         lines.len()
@@ -427,6 +447,22 @@ impl Editor {
         self.move_cursor_right();
     }
 
+    fn delete_char(&mut self) {
+        if self.text_buffer.len() == 0 {
+            return;
+        }
+
+        self.text_buffer.remove(self.cursor_index);
+    }
+
+    fn get_lines(&self) -> Vec<&str> {
+        if self.text_buffer.len() == 0 {
+            return vec![""];
+        }
+
+        self.text_buffer.lines().collect()
+    }
+
     fn render(&self) -> Result<()> {
         let mut stdout = std::io::stdout();
 
@@ -434,10 +470,10 @@ impl Editor {
             &mut stdout,
             SaveCursorPosition,
             MoveCursorTo(0, 0),
-            ClearBuffer::Below
+            ClearBuffer::Below,
         )?;
 
-        let lines: Vec<_> = self.text_buffer.lines().collect();
+        let lines = self.get_lines();
 
         // Create a render buffer to limit write syscalls
         let mut render_buffer = Vec::new();
@@ -490,6 +526,11 @@ impl Editor {
             col_index,
             row_len
         )?;
+
+        match self.mode {
+            EditorMode::Normal => execute!(&mut stdout, SetCursorBlinkingBlock)?,
+            EditorMode::Insert => execute!(&mut stdout, SetCursorBlinkingUnderline)?,
+        }
 
         execute!(&mut render_buffer, RestoreCursorPosition)?;
 
